@@ -51,8 +51,8 @@ class Manager:
         if self.is_remote_template:
             temp_template_dir = tempfile.mkdtemp()
             try:
-                Repo.clone_from(self.template_path, temp_template_dir)
                 print('Cloning repo...')
+                Repo.clone_from(self.template_path, temp_template_dir)
                 shutil.rmtree(os.path.join(temp_template_dir, '.git'), ignore_errors=True)
             except OSError:
                 shutil.rmtree(temp_template_dir, ignore_errors=True)

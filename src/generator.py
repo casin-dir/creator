@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 
 from utils.asker import ask
 
@@ -11,7 +12,11 @@ class Generator:
         self.template_root = os.path.abspath(template_path)
 
         self.params = {}
-        self.dirs_templates = {}
+
+        self.creator_script_path = None
+
+        if '.creator-script' in os.listdir(self.template_root):
+            self.creator_script_path = os.path.join(self.template_root, '.creator-script')
 
     def run(self):
         self.handle_template_dir(self.template_root, self.target_path, self.target_name)
@@ -22,6 +27,8 @@ class Generator:
 
         if need_make is False:
             return None
+
+        self.try_run_creator_script('BEFORE')
 
         if target_name is not None:
             pure_name = target_name
@@ -108,6 +115,16 @@ class Generator:
 
         self.params[param_name] = param_value
         return param_value
+
+    def try_run_creator_script(self, stage, item='/'):
+        # new_env = os.environ.copy()
+        # new_env['CREATOR_SCRIPT_STAGE'] = stage
+        # new_env['CREATOR_SCRIPT_ITEM'] = item
+        # subprocess.Popen('cat ' + self.creator_script_path, env=new_env)
+
+        # run here in bash
+        #   $ CREATOR_SCRIPT_STAGE=${stage} CREATOR_SCRIPT_ITEM=${item} ./${self.creator_script_path}
+        print(self.creator_script_path)
 
     @staticmethod
     def make_dir(path):
