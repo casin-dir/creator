@@ -116,8 +116,8 @@ class Generator:
         os.makedirs(path)
 
     @staticmethod
-    def is_chunk(str):
-        if '@' in str:
+    def is_chunk(str_to_check):
+        if '@' in str_to_check:
             return True
 
         return False
