@@ -30,62 +30,57 @@ class Generator:
         self.make_dir(target_dir_path)
 
         children_names = os.listdir(dir_path)
+        children_names_without_chunks = []
+
+        chunks = []
 
         for child_name in children_names:
+            if self.is_chunk(child_name):
+                chunk_pure_name = self.get_chunk_pure_name(child_name)
+                chunks.append({
+                    'pure_name': chunk_pure_name,
+                    'path': os.path.join(dir_path, child_name),
+                })
+            else:
+                children_names_without_chunks.append(child_name)
+
+        for child_name in children_names_without_chunks:
             child_path = os.path.join(dir_path, child_name)
 
             if os.path.isdir(child_path):
                 self.handle_template_dir(child_path, target_dir_path)
 
             if os.path.isfile(child_path):
-                self.handle_dir_file(child_path, target_dir_path)
+                self.handle_dir_file(child_path, target_dir_path, chunks)
 
-        print(self.dirs_templates)
-        print('build templates here')
-
-    def handle_dir_file(self, file_path, target_path):
+    def handle_dir_file(self, file_path, target_path, chunks):
 
         file_dir = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
 
-        dir_templates = self.dirs_templates.get(file_dir)
-        if dir_templates is None:
-            self.dirs_templates[file_dir] = {}
-
-        is_chunk, chunk_name, template_name = self.is_chunk_file(file_name)
-
-        if is_chunk is True:
-            template_info = self.dirs_templates[file_dir].get(template_name)
-
-            if template_info is None:
-                self.dirs_templates[file_dir][template_name] = {
-                    'need_build': True,
-                    'file_path': None,
-                    'chunks': [],
-                }
-
-            template_info = self.dirs_templates[file_dir][template_name]
-
-            template_info['chunks'].append({
-                'chunk_name': chunk_name,
-                'chunk_path': file_path,
-            })
-
+        need_build, pure_name = self.ask_params_and_get_pure_name(file_name)
+        if need_build is False:
             return None
 
-        need_build, pure_name = self.ask_params_and_get_pure_name(file_name)
-        template_info = self.dirs_templates[file_dir].get(pure_name)
-
-        if template_info is None:
-            self.dirs_templates[file_dir][pure_name] = {
-                'need_build': True,
-                'file_path': None,
-                'chunks': [],
-            }
-
-        self.dirs_templates[file_dir][pure_name]['need_build'] = need_build
-        self.dirs_templates[file_dir][pure_name]['file_path'] = file_path
-        print('prec')
+        try:
+            with open(file_path, 'r',  encoding='utf8') as template_file:
+                with open(os.path.join(target_path, pure_name), 'w', encoding='utf8') as target_file:
+                    for line in template_file:
+                        if self.is_chunk(line):
+                            for chunk_info in chunks:
+                                chunk_pure_name = chunk_info['pure_name']
+                                chunk_path = chunk_info['path']
+                                if chunk_pure_name in line:
+                                    if self.need(chunk_pure_name):
+                                        with open(chunk_path, 'r', encoding='utf8') as chunk_file:
+                                            line = chunk_file.read() + '\n'
+                                    else:
+                                        line = ''
+                                        break
+                        target_file.write(line)
+        except:
+            print('*** File ' + file_name + ' in ' + file_dir + ' has been ignored ***')
+            return None
 
     def ask_params_and_get_pure_name(self, name):
         if '?' in name:
@@ -94,11 +89,7 @@ class Generator:
             pure_name = name_chunks[-1]
 
             for param_name in params_names:
-                param_value = self.params.get(param_name)
-                if param_value is None:
-                    param_value = self.need(param_name)
-
-                self.params[param_name] = param_value
+                param_value = self.need(param_name)
                 if param_value is False:
                     return False, pure_name
 
@@ -106,13 +97,17 @@ class Generator:
         else:
             return True, name
 
-    @staticmethod
-    def need(param_name):
-        return ask(
-            'Need ' + param_name + '? (y/n): ',
-            lambda res: res in ('y', 'n'),
-            lambda res: res == 'y'
-        )
+    def need(self, param_name):
+        param_value = self.params.get(param_name)
+        if param_value is None:
+            param_value = ask(
+                'Need ' + param_name + '? (y/n): ',
+                lambda res: res in ('y', 'n'),
+                lambda res: res == 'y'
+            )
+
+        self.params[param_name] = param_value
+        return param_value
 
     @staticmethod
     def make_dir(path):
@@ -121,11 +116,12 @@ class Generator:
         os.makedirs(path)
 
     @staticmethod
-    def is_chunk_file(name):
-        if '@' in name:
-            name_params = name.split('@')
-            chunk_name = name_params[:-1][0]
-            template_name = name_params[-1]
-            return True, chunk_name, template_name
-        else:
-            return False, None, None
+    def is_chunk(str):
+        if '@' in str:
+            return True
+
+        return False
+
+    @staticmethod
+    def get_chunk_pure_name(name):
+        return os.path.splitext(name.split('@')[1])[0]
