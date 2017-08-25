@@ -93,7 +93,7 @@ class Manager:
     @staticmethod
     def print_help():
         print('='*80)
-        print('Welcome to Creator v 0.0.1\n')
+        print('Welcome to Creator v 0.1.0\n')
         print('For *pro* run in any dir: \n    $ creator -t <path_to_template> '
               '-p <path_to_project_dir> <project_name>\n')
         print('For *newbies* run in dir where will be placed the project: \n    $ creator\n')
