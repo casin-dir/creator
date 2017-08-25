@@ -96,7 +96,7 @@ class Manager:
         print('Welcome to Creator v 0.0.1\n')
         print('For *pro* run in any dir: \n    $ creator -t <path_to_template> '
               '-p <path_to_project_dir> <project_name>\n')
-        print('For *newbies* run in dir where will placed the project: \n    $ creator\n')
+        print('For *newbies* run in dir where will be placed the project: \n    $ creator\n')
         print('<path_to_template> can be like: '
               '\n    \"https://github.com/casin-dir/test_template.git\"'
               '\n    \"~/Templates/my_template\"\n')
