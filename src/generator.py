@@ -138,6 +138,11 @@ class Generator:
             return True, name
 
     def need(self, param_name):
+        is_inverted = config.LOGIC_NEGATIVE_SYMBOL == param_name[0]
+
+        if is_inverted:
+            param_name = param_name[1:]
+
         param_value = self.params.get(param_name)
         if param_value is None:
             param_value = ask(
@@ -147,15 +152,14 @@ class Generator:
             )
 
         self.params[param_name] = param_value
-        return param_value
+        return param_value if not is_inverted else not param_value
 
     @staticmethod
     def run_user_script(script_path, stage, item=config.CREATOR_SCRIPT_ITEM_ROOT):
         subprocess.call('chmod +x ' + script_path, shell=True)
         subprocess.call(
-            config.CREATOR_SCRIPT_STAGE_VARIABLE + '={0} ' +
-            config.CREATOR_SCRIPT_ITEM_VARIABLE + '={1} '
-            '{2}'.format(stage, item, script_path),
+            config.CREATOR_SCRIPT_STAGE_VARIABLE + '=' + stage + ' ' +
+            config.CREATOR_SCRIPT_ITEM_VARIABLE + '=' + item + ' ' + script_path,
             shell=True
         )
 
