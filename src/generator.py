@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 
+import config
 from utils.asker import ask
 
 
@@ -13,11 +14,6 @@ class Generator:
 
         self.params = {}
 
-        self.creator_script_path = None
-
-        if '.creator-script' in os.listdir(self.template_root):
-            self.creator_script_path = os.path.join(self.template_root, '.creator-script')
-
     def run(self):
         self.handle_template_dir(self.template_root, self.target_path, self.target_name)
 
@@ -28,8 +24,6 @@ class Generator:
         if need_make is False:
             return None
 
-        self.try_run_creator_script('BEFORE')
-
         if target_name is not None:
             pure_name = target_name
 
@@ -37,9 +31,28 @@ class Generator:
         self.make_dir(target_dir_path)
 
         children_names = os.listdir(dir_path)
-        children_names_without_chunks = []
+
+        user_script_path = None
+
+        filtered_children_names = []
 
         chunks = []
+
+        files_to_ignore = config.DEFAULT_IGNORED_FILES
+
+        if config.CREATOR_IGNORE_FILE in children_names:
+            with open(os.path.join(dir_path, config.CREATOR_IGNORE_FILE), 'r',  encoding='utf8') as ignore_file:
+                for line in ignore_file:
+                    file_name_to_ignore = line.rstrip()
+                    if len(file_name_to_ignore) > 0:
+                        files_to_ignore.append(file_name_to_ignore)
+
+        if config.CREATOR_SCRIPT_FILE in children_names:
+            user_script_path = os.path.join(dir_path, config.CREATOR_SCRIPT_FILE)
+            self.run_user_script(
+                user_script_path,
+                config.CREATOR_SCRIPT_STAGE_BEFORE,
+            )
 
         for child_name in children_names:
             if self.is_chunk(child_name):
@@ -48,19 +61,25 @@ class Generator:
                     'pure_name': chunk_pure_name,
                     'path': os.path.join(dir_path, child_name),
                 })
-            else:
-                children_names_without_chunks.append(child_name)
+            elif child_name not in files_to_ignore:
+                filtered_children_names.append(child_name)
 
-        for child_name in children_names_without_chunks:
+        for child_name in filtered_children_names:
             child_path = os.path.join(dir_path, child_name)
 
             if os.path.isdir(child_path):
                 self.handle_template_dir(child_path, target_dir_path)
 
             if os.path.isfile(child_path):
-                self.handle_dir_file(child_path, target_dir_path, chunks)
+                self.handle_dir_file(child_path, target_dir_path, chunks, user_script_path)
 
-    def handle_dir_file(self, file_path, target_path, chunks):
+        if user_script_path is not None:
+            self.run_user_script(
+                user_script_path,
+                config.CREATOR_SCRIPT_STAGE_AFTER,
+            )
+
+    def handle_dir_file(self, file_path, target_path, chunks, user_script_path):
 
         file_dir = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
@@ -68,6 +87,13 @@ class Generator:
         need_build, pure_name = self.ask_params_and_get_pure_name(file_name)
         if need_build is False:
             return None
+
+        if user_script_path is not None:
+            self.run_user_script(
+                user_script_path,
+                config.CREATOR_SCRIPT_STAGE_BEFORE,
+                pure_name
+            )
 
         try:
             with open(file_path, 'r',  encoding='utf8') as template_file:
@@ -89,9 +115,16 @@ class Generator:
             print('*** File ' + file_name + ' in ' + file_dir + ' has been ignored ***')
             return None
 
+        if user_script_path is not None:
+            self.run_user_script(
+                user_script_path,
+                config.CREATOR_SCRIPT_STAGE_AFTER,
+                pure_name
+            )
+
     def ask_params_and_get_pure_name(self, name):
-        if '?' in name:
-            name_chunks = name.split('?')
+        if config.LOGIC_PARAM_SYMBOL in name:
+            name_chunks = name.split(config.LOGIC_PARAM_SYMBOL)
             params_names = name_chunks[:-1]
             pure_name = name_chunks[-1]
 
@@ -116,15 +149,15 @@ class Generator:
         self.params[param_name] = param_value
         return param_value
 
-    def try_run_creator_script(self, stage, item='/'):
-        # new_env = os.environ.copy()
-        # new_env['CREATOR_SCRIPT_STAGE'] = stage
-        # new_env['CREATOR_SCRIPT_ITEM'] = item
-        # subprocess.Popen('cat ' + self.creator_script_path, env=new_env)
-
-        # run here in bash
-        #   $ CREATOR_SCRIPT_STAGE=${stage} CREATOR_SCRIPT_ITEM=${item} ./${self.creator_script_path}
-        print(self.creator_script_path)
+    @staticmethod
+    def run_user_script(script_path, stage, item=config.CREATOR_SCRIPT_ITEM_ROOT):
+        subprocess.call('chmod +x ' + script_path, shell=True)
+        subprocess.call(
+            config.CREATOR_SCRIPT_STAGE_VARIABLE + '={0} ' +
+            config.CREATOR_SCRIPT_ITEM_VARIABLE + '={1} '
+            '{2}'.format(stage, item, script_path),
+            shell=True
+        )
 
     @staticmethod
     def make_dir(path):
@@ -134,11 +167,11 @@ class Generator:
 
     @staticmethod
     def is_chunk(str_to_check):
-        if '@' in str_to_check:
+        if config.CHUNK_SYMBOL in str_to_check:
             return True
 
         return False
 
     @staticmethod
     def get_chunk_pure_name(name):
-        return os.path.splitext(name.split('@')[1])[0]
+        return os.path.splitext(name.split(config.CHUNK_SYMBOL)[1])[0]
