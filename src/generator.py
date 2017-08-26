@@ -4,6 +4,7 @@ import subprocess
 
 import config
 from utils.asker import ask
+from utils.formatter import formatter
 
 
 class Generator:
